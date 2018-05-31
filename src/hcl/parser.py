@@ -1,8 +1,8 @@
 
 from os.path import abspath, dirname, exists, join
-import sys
+import re, sys
 
-from .lexer import Lexer
+from lexer import Lexer
 from ply import lex, yacc
 
 import inspect
@@ -42,7 +42,7 @@ class HclParser(object):
         'NUMBER',
         'COMMA', 'COMMAEND', 'IDENTIFIER', 'EQUAL', 'STRING', 'MINUS',
         'LEFTBRACE', 'RIGHTBRACE', 'LEFTBRACKET', 'RIGHTBRACKET', 'PERIOD',
-        'EPLUS', 'EMINUS'
+        'EPLUS', 'EMINUS', 'NL'
     )
     
     #
@@ -98,13 +98,22 @@ class HclParser(object):
         "objectlist : objectitem"
         if DEBUG:
             self.print_p(p)
+        if not p[1]:
+            return
         p[0] = [p[1]]
     
     def p_objectlist_1(self, p):
         "objectlist : objectlist objectitem"
         if DEBUG:
             self.print_p(p)
-        p[0] = p[1] + [p[2]]
+        if not p[1]:
+            p[0] = [p[2]]
+        elif not p[2]:
+            p[0] = p[1]
+        else:
+            p[0] = p[1] + [p[2]]
+        if DEBUG:
+            self.print_p(p)
 
     def p_objectlist_2(self, p):
         "objectlist : objectlist COMMA objectitem"
@@ -152,6 +161,10 @@ class HclParser(object):
         p[0] = (p[1], p[3])
     
     def p_objectitem_1(self, p):
+        "objectitem : NL"
+        #print ('NL!', p.lexer.lex.lineno)
+
+    def p_objectitem_2(self, p):
         "objectitem : block"
         if DEBUG:
             self.print_p(p)
@@ -279,7 +292,7 @@ class HclParser(object):
     def print_p(self, p):
         if DEBUG:
             name = inspect.getouterframes(inspect.currentframe(), 2)[1][3]
-            print('%20s: %s' % (name, ' | '.join([str(p[i]) for i in range(0, len(p))])))
+            print('(%d) %20s: %s' % (p.lexer.lex.lineno, name, ' | '.join([str(p[i]) for i in range(0, len(p))])))
 
     def p_error(self, p):
         # Derived from https://groups.google.com/forum/#!topic/ply-hack/spqwuM1Q6gM
@@ -304,6 +317,15 @@ class HclParser(object):
         self.yacc = yacc.yacc(module=self, debug=False, optimize=1, picklefile=pickle_file)
         
     def parse(self, s):
+        # Convert each blank line to !NL!
+        lines = s.split('\n')
+
+        for i, line in enumerate(lines):
+            if not line.strip():
+                lines[i] = '!NL!'
+        s = '\n'.join(lines)
+        #print (s)
+
         return self.yacc.parse(s, lexer=Lexer())
 
 

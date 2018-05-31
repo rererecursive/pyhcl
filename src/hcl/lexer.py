@@ -29,7 +29,7 @@ class Lexer(object):
         'NUMBER',
         'COMMA', 'IDENTIFIER', 'EQUAL', 'STRING', 'MINUS',
         'LEFTBRACE', 'RIGHTBRACE', 'LEFTBRACKET', 'RIGHTBRACKET', 'PERIOD',
-        'EPLUS', 'EMINUS',
+        'EPLUS', 'EMINUS', 'NL',
     )
 
     states = (
@@ -233,6 +233,7 @@ class Lexer(object):
 
     t_EQUAL = r'='
     t_MINUS = r'-'
+    t_NL = r'!NL!'
 
     t_LEFTBRACE = r'\{'
     t_RIGHTBRACE = r'\}'
