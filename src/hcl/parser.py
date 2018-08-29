@@ -12,7 +12,7 @@ DEBUG = False
 # When using something like pyinstaller, the __file__ attribute isn't actually
 # set correctly, so the parse file isn't able to be saved anywhere sensible.
 # In these cases, just use a temporary directory, it doesn't take too long to
-# generate the tables anyways... 
+# generate the tables anyways...
 
 if exists(dirname(__file__)):
     pickle_file = abspath(join(dirname(__file__), 'parsetab.dat'))
@@ -31,11 +31,11 @@ else:
 
 
 class HclParser(object):
-    
+
     #
     # Tokens
     #
-    
+
     tokens = (
         'BOOL',
         'FLOAT',
@@ -44,24 +44,24 @@ class HclParser(object):
         'LEFTBRACE', 'RIGHTBRACE', 'LEFTBRACKET', 'RIGHTBRACKET', 'PERIOD',
         'EPLUS', 'EMINUS', 'NL'
     )
-    
+
     #
     # Yacc parser section
     #
     def objectlist_flat(self, lt, replace):
         '''
             Similar to the dict constructor, but handles dups
-            
+
             HCL is unclear on what one should do when duplicate keys are
             encountered. These comments aren't clear either:
-            
+
             from decoder.go: if we're at the root or we're directly within
                              a list, decode into dicts, otherwise lists
-                
+
             from object.go: there's a flattened list structure
         '''
         d = {}
-        
+
         for k,v in lt:
             if k in d.keys() and not replace:
                 if type(d[k]) is list:
@@ -86,14 +86,14 @@ class HclParser(object):
                     d[k] = v
 
         return d
-    
+
     def p_top(self, p):
         "top : objectlist"
         if DEBUG:
             self.print_p(p)
         p[0] = self.objectlist_flat(p[1],True)
-    
-    
+
+
     def p_objectlist_0(self, p):
         "objectlist : objectitem"
         if DEBUG:
@@ -101,7 +101,7 @@ class HclParser(object):
         if not p[1]:
             return
         p[0] = [p[1]]
-    
+
     def p_objectlist_1(self, p):
         "objectlist : objectlist objectitem"
         if DEBUG:
@@ -120,13 +120,13 @@ class HclParser(object):
         if DEBUG:
             self.print_p(p)
         p[0] = p[1] + [p[3]]
-    
+
     def p_object_0(self, p):
         "object : LEFTBRACE objectlist RIGHTBRACE"
         if DEBUG:
             self.print_p(p)
         p[0] = self.objectlist_flat(p[2],False)
-        
+
     def p_object_1(self, p):
         "object : LEFTBRACE objectlist COMMA RIGHTBRACE"
         if DEBUG:
@@ -138,7 +138,7 @@ class HclParser(object):
         if DEBUG:
             self.print_p(p)
         p[0] = {}
-    
+
     def p_objectkey_0(self, p):
         '''
         objectkey : IDENTIFIER
@@ -147,7 +147,7 @@ class HclParser(object):
         if DEBUG:
             self.print_p(p)
         p[0] = p[1]
-    
+
     def p_objectitem_0(self, p):
         '''
         objectitem : objectkey EQUAL number
@@ -159,7 +159,7 @@ class HclParser(object):
         if DEBUG:
             self.print_p(p)
         p[0] = (p[1], p[3])
-    
+
     def p_objectitem_1(self, p):
         "objectitem : NL"
         #print ('NL!', p.lexer.lex.lineno)
@@ -169,20 +169,20 @@ class HclParser(object):
         if DEBUG:
             self.print_p(p)
         p[0] = p[1]
-    
-    
+
+
     def p_block_0(self, p):
         "block : blockId object"
         if DEBUG:
             self.print_p(p)
         p[0] = (p[1], p[2])
-        
+
     def p_block_1(self, p):
         "block : blockId block"
         if DEBUG:
             self.print_p(p)
         p[0] = (p[1], {p[2][0]: p[2][1]})
-        
+
     def p_blockId(self, p):
         '''
         blockId : IDENTIFIER
@@ -191,8 +191,8 @@ class HclParser(object):
         if DEBUG:
             self.print_p(p)
         p[0] = p[1]
-    
-    
+
+
     def p_list_0(self, p):
         '''
         list : LEFTBRACKET listitems RIGHTBRACKET
@@ -201,20 +201,20 @@ class HclParser(object):
         if DEBUG:
             self.print_p(p)
         p[0] = p[2]
-        
+
     def p_list_1(self, p):
         "list : LEFTBRACKET RIGHTBRACKET"
         if DEBUG:
             self.print_p(p)
         p[0] = []
-        
-        
+
+
     def p_listitems_0(self, p):
         "listitems : listitem"
         if DEBUG:
             self.print_p(p)
         p[0] = [p[1]]
-        
+
     def p_listitems_1(self, p):
         "listitems : listitems COMMA listitem"
         if DEBUG:
@@ -230,51 +230,51 @@ class HclParser(object):
         if DEBUG:
             self.print_p(p)
         p[0] = p[1]
-        
+
     def p_number_0(self, p):
         "number : int"
         if DEBUG:
             self.print_p(p)
         p[0] = p[1]
-        
+
     def p_number_1(self, p):
         "number : float"
         if DEBUG:
             self.print_p(p)
         p[0] = float(p[1])
-        
+
     def p_number_2(self, p):
         "number : int exp"
         if DEBUG:
             self.print_p(p)
         p[0] = float("{0}{1}".format(p[1], p[2]))
-        
+
     def p_number_3(self, p):
         "number : float exp"
         if DEBUG:
             self.print_p(p)
         p[0] = float("{0}{1}".format(p[1], p[2]))
-        
+
     def p_int_0(self, p):
         "int : MINUS int"
         if DEBUG:
             self.print_p(p)
         p[0] = -p[2]
-        
+
     def p_int_1(self, p):
         "int : NUMBER"
         if DEBUG:
             self.print_p(p)
         p[0] = p[1]
-        
+
     def p_float_0(self, p):
         "float : MINUS float"
         p[0] = p[2] * -1
-        
+
     def p_float_1(self, p):
         "float : FLOAT"
         p[0] = p[1]
-        
+
     def p_exp_0(self, p):
         "exp : EPLUS NUMBER"
         if DEBUG:
@@ -286,8 +286,8 @@ class HclParser(object):
         if DEBUG:
             self.print_p(p)
         p[0] = "e-{0}".format(p[2])
-   
-    
+
+
     # useful for debugging the parser
     def print_p(self, p):
         if DEBUG:
@@ -296,7 +296,7 @@ class HclParser(object):
 
     def p_error(self, p):
         # Derived from https://groups.google.com/forum/#!topic/ply-hack/spqwuM1Q6gM
-        
+
         #Ugly hack since Ply doesn't provide any useful error information
         try:
             frame = inspect.currentframe()
@@ -304,32 +304,73 @@ class HclParser(object):
             expected = "; expected %s" % (', '.join(cvars['actions'][cvars['state']].keys()))
         except:
             expected = ""
-        
+
         if p is not None:
             msg = "Line %d, column %d: unexpected %s%s" % (p.lineno, p.lexpos, p.type, expected)
         else:
             msg = "Unexpected end of file%s" % expected
-        
+
         raise ValueError(msg)
-    
-        
+
+
     def __init__(self):
         self.yacc = yacc.yacc(module=self, debug=False, optimize=1, picklefile=pickle_file)
         self.lexer = Lexer()
-        
+
     def parse(self, s):
-        # Convert each blank line to !NL!
         results = {}
         lines = s.split('\n')
 
+        # Convert each blank line to !NL!
         for i, line in enumerate(lines):
             if not line.strip():
                 lines[i] = '!NL!'
         s = '\n'.join(lines)
-        #print (s)
+
         parsed = self.yacc.parse(s, self.lexer)
         results['commented_lines'] = self.lexer.commented_lines
 
         return results
+
+class Top():
+    """Holds all the information about a parsed Terraform file.
+    """
+    def __init__(self):
+        self.blank_lines = []
+        self.commented_lines = []
+        self.blocks = []
+
+class Block():
+    """Represents a resource/provider/etc block.
+    """
+    def __init__(self, line_start=-1):
+        self.line_start = line_start    # Token
+        self.line_end = line_end        # Token
+        self.blank_lines = []
+        self.definition = {}            # Definition
+        self.arguments = []             # Argument
+
+class Definition():
+    """Represents the definition of a block, e.g. 'resource "aws_instance" "hello"'
+    """
+    def __init__(self, keyword=None, type=None, none=None):
+        self.keyword = keyword
+        self.type = type
+        self.name = name
+
+class Argument():
+    """Represents an argument in a block.
+    """
+    def __init__(self):
+        self.blocks = []
+        self.items = []
+
+class Token():
+    """Represents a string in a Terraform file.
+    """
+    def __init__(self, start, end, text):
+        self.start = start
+        self.end = end
+        self.text = text
 
 
