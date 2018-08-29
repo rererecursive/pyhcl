@@ -315,9 +315,11 @@ class HclParser(object):
         
     def __init__(self):
         self.yacc = yacc.yacc(module=self, debug=False, optimize=1, picklefile=pickle_file)
+        self.lexer = Lexer()
         
     def parse(self, s):
         # Convert each blank line to !NL!
+        results = {}
         lines = s.split('\n')
 
         for i, line in enumerate(lines):
@@ -325,8 +327,9 @@ class HclParser(object):
                 lines[i] = '!NL!'
         s = '\n'.join(lines)
         #print (s)
+        parsed = self.yacc.parse(s, self.lexer)
+        results['commented_lines'] = self.lexer.commented_lines
 
-        return self.yacc.parse(s, lexer=Lexer())
-
+        return results
 
 

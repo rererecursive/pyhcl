@@ -1,6 +1,6 @@
 
 import json
-from .parser import HclParser
+from parser import HclParser
 
 import sys
 

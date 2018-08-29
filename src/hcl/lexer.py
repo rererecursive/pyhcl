@@ -242,7 +242,8 @@ class Lexer(object):
 
     def t_COMMENT(self, t):
         r'(\#|(//)).*'
-        pass
+        if self.input_lines[t.lexer.lineno - 1].strip().startswith('#'):
+            self.commented_lines.append(t.lexer.lineno - 1) # The lexer starts lines at 1.
 
     def t_MULTICOMMENT(self, t):
         r'/\*(.|\n)*?(\*/)'
@@ -275,8 +276,10 @@ class Lexer(object):
 
     def __init__(self):
         self.lex = lex.lex(module=self, debug=False, reflags=(re.UNICODE | re.MULTILINE), errorlog=lex.NullLogger())
+        self.commented_lines = []
 
     def input(self, s):
+        self.input_lines = s.split('\n')
         return self.lex.input(s)
 
     def token(self):
