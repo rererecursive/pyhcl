@@ -357,7 +357,6 @@ class HclParser(object):
 
 
     def parse(self, s):
-        results = {}
         lines = s.split('\n')
 
         # Convert each blank line to !NL!
@@ -367,9 +366,10 @@ class HclParser(object):
         s = '\n'.join(lines)
 
         parsed = self.yacc.parse(s, self.lexer)
-        results['commented_lines'] = self.lexer.commented_lines
+        self.top.commented_lines = self.lexer.commented_lines
 
-        return results
+        return self.top
+    
 
 class Top():
     """Holds all the information about a parsed Terraform file.
@@ -378,6 +378,9 @@ class Top():
         self.blank_lines = []
         self.commented_lines = []
         self.blocks = []
+        
+    def __repr__(self):
+        return str(self.__dict__)
 
 class Block():
     """Represents a resource/provider/etc block.
@@ -388,9 +391,12 @@ class Block():
         self.blank_lines = []
         self.definition = Definition()
         self.arguments = Arguments()
+        
+    def __repr__(self):
+        return str(self.__dict__)
 
     def add_argument_item(self, key, value, line_no):
-        self.arguments.items.append({'key': key, 'value': value, 'line_no': line_no})
+        self.arguments.items.append({key: value, 'line_no': line_no})
 
     def add_definition_item(self, text):
         self.definition.add_item(text)
@@ -402,6 +408,9 @@ class Definition():
         self.keyword = keyword
         self.type = type
         self.name = name
+        
+    def __repr__(self):
+        return str(self.__dict__)
 
     def add_item(self, text):
         """For a definition of length 2, only use the keyword and name.
@@ -426,6 +435,9 @@ class Arguments():
     def __init__(self):
         self.blocks = []
         self.items = []
+        
+    def __repr__(self):
+        return str(self.__dict__)
 
 class Token():
     """Represents a string in a Terraform file.
@@ -434,6 +446,9 @@ class Token():
         self.start = start
         self.end = end
         self.text = text
+        
+    def __repr__(self):
+        return str(self.__dict__)
 
 class Errors(Enum):
     KEEP_PREVIOUS_STATE = 1
