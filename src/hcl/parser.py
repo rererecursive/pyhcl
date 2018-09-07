@@ -5,6 +5,7 @@ import re, sys
 
 from lexer import Lexer
 from ply import lex, yacc
+import util
 
 import inspect
 
@@ -44,7 +45,7 @@ class HclParser(object):
         'NUMBER',
         'COMMA', 'COMMAEND', 'IDENTIFIER', 'EQUAL', 'STRING', 'MINUS',
         'LEFTBRACE', 'RIGHTBRACE', 'LEFTBRACKET', 'RIGHTBRACKET', 'PERIOD',
-        'EPLUS', 'EMINUS', 'NL'
+        'EPLUS', 'EMINUS', 'NEWLINE'
     )
 
     #
@@ -167,8 +168,9 @@ class HclParser(object):
         p[0] = (p[1], p[3])
 
     def p_objectitem_1(self, p):
-        "objectitem : NL"
-        line_no = p.lexer.lex.lineno - 2
+        "objectitem : NEWLINE"
+        # The line number is appended to the token.
+        line_no = int(p[1].replace('!NL!', ''))
 
         try:
             block = self.working_block_stack[-1]
@@ -189,8 +191,13 @@ class HclParser(object):
         # The end of a block.
         line_no = p.lexer.lex.lineno - 2
         block = self.working_block_stack.pop()
+        print("DEBUG: Popped block '%s' at line %d." % (block, line_no))
         block.line_end = line_no
-        self.top.blocks.append(block)
+
+        try:
+            self.working_block_stack[-1].add_argument_block(block)
+        except IndexError:
+            self.top.blocks.append(block)
 
         if DEBUG:
             self.print_p(p)
@@ -209,6 +216,9 @@ class HclParser(object):
         '''
         # The beginning of a block (i.e. a block definition).
         line_no = p.lexer.lex.lineno - 1
+        line_text = p.lexer.input_lines[line_no]
+        print("DEBUG: Found block '%s' at line %d." % (line_text, line_no))
+
         try:
             block = self.working_block_stack[-1]
         except IndexError:
@@ -217,11 +227,12 @@ class HclParser(object):
 
         if block.line_start != line_no:
             # A new block.
+            print("DEBUG: Found nested block '%s' at line %d." % (line_text, line_no))
             new_block = Block(line_start=line_no)
-            new_block.add_definition_item(p[1])
+            new_block.add_definition_item(p[1], line_text)
             self.working_block_stack.append(new_block)
         else:
-            block.add_definition_item(p[1])
+            block.add_definition_item(p[1], line_text)
 
         if DEBUG:
             self.print_p(p)
@@ -362,14 +373,15 @@ class HclParser(object):
         # Convert each blank line to !NL!
         for i, line in enumerate(lines):
             if not line.strip():
-                lines[i] = '!NL!'
+                # Append the line number as the parser doesn't always know which line it's on
+                lines[i] = '!NL!' + str(i)
         s = '\n'.join(lines)
 
         parsed = self.yacc.parse(s, self.lexer)
         self.top.commented_lines = self.lexer.commented_lines
 
         return self.top
-    
+
 
 class Top():
     """Holds all the information about a parsed Terraform file.
@@ -378,56 +390,84 @@ class Top():
         self.blank_lines = []
         self.commented_lines = []
         self.blocks = []
-        
-    def __repr__(self):
-        return str(self.__dict__)
+
+    def to_dictionary(self):
+        return util.to_dictionary(self)
 
 class Block():
     """Represents a resource/provider/etc block.
     """
     def __init__(self, line_start=-1):
-        self.line_start = line_start    # Token
-        self.line_end = -1              # Token
+        self.line_start = line_start
+        self.line_end = -1
         self.blank_lines = []
         self.definition = Definition()
         self.arguments = Arguments()
-        
-    def __repr__(self):
-        return str(self.__dict__)
 
     def add_argument_item(self, key, value, line_no):
         self.arguments.items.append({key: value, 'line_no': line_no})
 
-    def add_definition_item(self, text):
-        self.definition.add_item(text)
+    def add_argument_block(self, block):
+        self.arguments.blocks.append(block)
+
+    def add_definition_item(self, text, line_text):
+        index = self.definition.count_instances_of_string(text)
+        start = self.find_nth(text, line_text, index)
+        end = start + len(text)
+        self.definition.add_item(text, start, end)
+
+    def find_nth(self, needle, haystack, n):
+        """Find the position of the nth occurrence of a string in another string.
+        """
+        start = haystack.find(needle)
+
+        while start >= 0 and n > 0:
+            start = haystack.find(needle, start+len(needle))
+            n -= 1
+
+        return start
 
 class Definition():
     """Represents the definition of a block, e.g. 'resource "aws_instance" "hello"'
     """
-    def __init__(self, keyword=None, type=None, name=None):
-        self.keyword = keyword
-        self.type = type
-        self.name = name
-        
-    def __repr__(self):
-        return str(self.__dict__)
+    def __init__(self):
+        self.keyword = {}
+        self.type = {}
+        self.name = {}
 
-    def add_item(self, text):
+    def add_item(self, text, start, end):
         """For a definition of length 2, only use the keyword and name.
-        Otherwise, include the type.
+        For anything longer, include the type.
         """
         if not self.keyword:
-            self.keyword = text
+            self.keyword = Token(text, start, end)
         elif not self.name:
-            self.name = text
+            self.name = Token(text, start, end)
         else:
             if not self.type:
                 self.type = self.name
-                self.name = text
+                self.name = Token(text, start, end)
             else:
                 if DEBUG:
                     print ("ERROR: a block cannot have a definition of greater than 3 strings. Skipping...")
                     # TODO: set error status and raise exception
+
+    def count_instances_of_string(self, string):
+        """Count the number of times a string appears in the definition.
+
+        Useful for knowing which part of the definition a string is in, as we
+        cannot know from the grammar.
+        """
+        total = 0
+
+        if self.keyword:
+            total += self.keyword.text.count(string)
+            if self.name:
+                total += self.name.text.count(string)
+            if self.type:
+                total += self.type.text.count(string)
+
+        return total
 
 class Arguments():
     """Represents an argument in a block.
@@ -435,20 +475,14 @@ class Arguments():
     def __init__(self):
         self.blocks = []
         self.items = []
-        
-    def __repr__(self):
-        return str(self.__dict__)
 
 class Token():
     """Represents a string in a Terraform file.
     """
-    def __init__(self, start, end, text):
+    def __init__(self, text, start, end):
+        self.text = text
         self.start = start
         self.end = end
-        self.text = text
-        
-    def __repr__(self):
-        return str(self.__dict__)
 
 class Errors(Enum):
     KEEP_PREVIOUS_STATE = 1

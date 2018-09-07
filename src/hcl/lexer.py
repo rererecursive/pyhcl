@@ -29,7 +29,7 @@ class Lexer(object):
         'NUMBER',
         'COMMA', 'IDENTIFIER', 'EQUAL', 'STRING', 'MINUS',
         'LEFTBRACE', 'RIGHTBRACE', 'LEFTBRACKET', 'RIGHTBRACKET', 'PERIOD',
-        'EPLUS', 'EMINUS', 'NL',
+        'EPLUS', 'EMINUS', 'NEWLINE',
     )
 
     states = (
@@ -38,6 +38,10 @@ class Lexer(object):
         ('heredoc', 'exclusive'),
         ('tabbedheredoc', 'exclusive'),
     )
+
+    def t_NEWLINE(self, t):
+        r'!NL!\d+'
+        return t
 
     def t_BOOL(self, t):
         r'(true)|(false)'
@@ -233,7 +237,6 @@ class Lexer(object):
 
     t_EQUAL = r'='
     t_MINUS = r'-'
-    t_NL = r'!NL!'
 
     t_LEFTBRACE = r'\{'
     t_RIGHTBRACE = r'\}'
